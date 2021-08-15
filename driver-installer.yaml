@@ -65,8 +65,6 @@ spec:
           env:
             - name: NVIDIA_DRIVER_VERSION
               value: "470"
-            - name: NVIDIA_INSTALL_DIR_HOST
-              value: /var/lib/nvidia
           args:
             - -exc
             - |
@@ -74,18 +72,10 @@ spec:
               dpkg --add-architecture i386
               apt-get update -y
 
-              # Install as many of the dependencies as possible before mounting
-              # the overlayfs to reduce the number of bins and libs that will be mounted
-              # into runtime containers.
-              apt-get install -y --no-install-recommends \
-                  build-essential \
-                  dkms \
-
               # Install Nvidia driver
               apt install -y --no-install-recommends \
+                build-essential dkms \
                 nvidia-driver-${NVIDIA_DRIVER_VERSION} \
-                libnvidia-encode-${NVIDIA_DRIVER_VERSION} \
-                libnvidia-common-${NVIDIA_DRIVER_VERSION} \
                 libnvidia-gl-${NVIDIA_DRIVER_VERSION}:i386 \
                 libnvidia-compute-${NVIDIA_DRIVER_VERSION}:i386
 
@@ -97,6 +87,27 @@ spec:
 
               # Verify installation
               nvidia-smi
+
+              # https://github.com/GoogleCloudPlatform/container-engine-accelerators/blob/176ef225b975c536ac31c1155fd33c3122cdb732/cmd/nvidia_gpu/nvidia_gpu.go#L39
+              export NVIDIA_DST_DIR=/home/kubernetes/bin/nvidia
+              mkdir -p ${NVIDIA_DST_DIR}
+
+              mkdir -p ${NVIDIA_DST_DIR}/bin
+              ls -1 /usr/bin/nvidia* | xargs -i cp {} ${NVIDIA_DST_DIR}/bin/
+
+              mkdir -p ${NVIDIA_DST_DIR}/lib32
+              ls -1 /usr/lib/i386-linux-gnu/{libGL*,libEGL*,libnv*,libcuda*} | xargs -i cp {} ${NVIDIA_DST_DIR}/lib32/
+
+              mkdir -p ${NVIDIA_DST_DIR}/lib64
+              ls -1 /usr/lib/x86_64-linux-gnu/{libGL*,libEGL*,libnv*,libcuda*} | xargs -i cp {} ${NVIDIA_DST_DIR}/lib64/
+
+              mkdir -p ${NVIDIA_DST_DIR}/drivers
+              ls -1 /lib/modules/"$(uname -r)"/updates/dkms/* | xargs -i cp {} ${NVIDIA_DST_DIR}/drivers/
+
+              # https://github.com/GoogleCloudPlatform/container-engine-accelerators/blob/176ef225b975c536ac31c1155fd33c3122cdb732/cmd/nvidia_gpu/nvidia_gpu.go#L41
+              export VULKAN_ICD_DST_DIR=/home/kubernetes/bin/nvidia/vulkan/icd.d
+              mkdir -p ${VULKAN_ICD_DST_DIR}
+              cp /usr/share/vulkan/icd.d/* ${VULKAN_ICD_DST_DIR}/
 
               touch /tmp/nvidia_driver_install_complete
 
