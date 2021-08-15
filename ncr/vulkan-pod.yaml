@@ -12,23 +12,20 @@ spec:
         sizeLimit: 10Mi
   containers:
     - name: app
-      image: vulkan-pod-app:fixed
-      command: ["/bin/bash", "-c", "--"]
-      args: ["while true; do sleep 600; done;"]
+      image: vulkan-app:fixed
+      command: ["vkcube"]
       env:
         - name: DISPLAY
           value: ":0"
-        - name: LD_LIBRARY_PATH
-          # https://github.com/GoogleCloudPlatform/container-engine-accelerators/blob/176ef225b975c536ac31c1155fd33c3122cdb732/cmd/nvidia_gpu/nvidia_gpu.go#L40
-          value: /usr/local/nvidia/lib64
-      resources:
-        limits:
-          nvidia.com/gpu: "1"
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: all
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: all
       volumeMounts:
         - name: x11
           mountPath: /tmp/.X11-unix
     - name: xserver
-      image: vulkan-pod-xserver:fixed
+      image: xserver:fixed
       env:
         - name: DISPLAY
           value: ":0"

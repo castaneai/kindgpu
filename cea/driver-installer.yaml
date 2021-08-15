@@ -1,54 +1,19 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: nvidia-driver-installer-ubuntu
-  namespace: kube-system
-  labels:
-    app: nvidia-driver-installer-ubuntu
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: nvidia-driver-installer-ubuntu
-  labels:
-    app: nvidia-driver-installer-ubuntu
-subjects:
-  - kind: ServiceAccount
-    name: nvidia-driver-installer-ubuntu
-    namespace: kube-system
-roleRef:
-  kind: ClusterRole
-  name: nvidia-driver-installer-ubuntu
-  apiGroup: rbac.authorization.k8s.io
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: nvidia-driver-installer-ubuntu
-  labels:
-    app: nvidia-driver-installer-ubuntu
-rules:
-  - apiGroups: [""] # "" indicates the core API group
-    resources: ["nodes", "pods"]
-    verbs: ["*"]
----
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: nvidia-driver-installer-ubuntu
+  name: driver-installer
   namespace: kube-system
 spec:
   selector:
     matchLabels:
-      app: nvidia-driver-installer-ubuntu
+      app: driver-installer
   updateStrategy:
     type: RollingUpdate
   template:
     metadata:
       labels:
-        app: nvidia-driver-installer-ubuntu
+        app: driver-installer
     spec:
-      serviceAccountName: nvidia-driver-installer-ubuntu
       hostNetwork: true
       hostPID: true
       volumes:
@@ -59,8 +24,8 @@ spec:
           hostPath:
             path: /
       initContainers:
-        - name: nvidia-driver-installer-ubuntu
-          image: "ubuntu:20.10"
+        - name: driver-installer
+          image: ubuntu:20.10
           command: ["/usr/sbin/chroot", "/root", "/bin/bash"]
           env:
             - name: NVIDIA_DRIVER_VERSION
@@ -68,16 +33,19 @@ spec:
           args:
             - -exc
             - |
+              if [[ -f /tmp/nvidia_driver_install_complete ]]; then
+                echo "Driver already installed."
+                exit 0
+              fi
+
               export DEBIAN_FRONTEND=noninteractive
               dpkg --add-architecture i386
               apt-get update -y
 
               # Install Nvidia driver
               apt install -y --no-install-recommends \
-                build-essential dkms \
-                nvidia-driver-${NVIDIA_DRIVER_VERSION} \
-                libnvidia-gl-${NVIDIA_DRIVER_VERSION}:i386 \
-                libnvidia-compute-${NVIDIA_DRIVER_VERSION}:i386
+                nvidia-driver-"${NVIDIA_DRIVER_VERSION}" \
+                libnvidia-gl-"${NVIDIA_DRIVER_VERSION}":i386
 
               # Install kernel modules
               modprobe nvidia-drm modeset=0
@@ -87,6 +55,8 @@ spec:
 
               # Verify installation
               nvidia-smi
+
+              touch /tmp/nvidia_driver_install_complete
 
               # https://github.com/GoogleCloudPlatform/container-engine-accelerators/blob/176ef225b975c536ac31c1155fd33c3122cdb732/cmd/nvidia_gpu/nvidia_gpu.go#L39
               export NVIDIA_DST_DIR=/home/kubernetes/bin/nvidia
@@ -108,8 +78,6 @@ spec:
               export VULKAN_ICD_DST_DIR=/home/kubernetes/bin/nvidia/vulkan/icd.d
               mkdir -p ${VULKAN_ICD_DST_DIR}
               cp /usr/share/vulkan/icd.d/* ${VULKAN_ICD_DST_DIR}/
-
-              touch /tmp/nvidia_driver_install_complete
 
           resources:
             requests:

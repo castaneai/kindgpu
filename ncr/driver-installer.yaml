@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: driver-installer
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: driver-installer
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: driver-installer
+    spec:
+      hostNetwork: true
+      hostPID: true
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: root-mount
+          hostPath:
+            path: /
+      initContainers:
+        - name: driver-installer
+          image: ubuntu:20.10
+          command: ["/usr/sbin/chroot", "/root", "/bin/bash"]
+          env:
+            - name: NVIDIA_DRIVER_VERSION
+              value: "470"
+          args:
+            - -exc
+            - |
+              if [[ -f /tmp/nvidia_driver_install_complete ]]; then
+                echo "Driver already installed."
+                exit 0
+              fi
+
+              export DEBIAN_FRONTEND=noninteractive
+              dpkg --add-architecture i386
+              apt-get update -y
+
+              # Install Nvidia driver
+              apt install -y --no-install-recommends \
+                nvidia-driver-"${NVIDIA_DRIVER_VERSION}" \
+                libnvidia-gl-"${NVIDIA_DRIVER_VERSION}":i386
+
+              # Install kernel modules
+              modprobe nvidia-drm modeset=0
+              modprobe nvidia
+              modprobe nvidia-uvm
+              modprobe nvidia-modeset
+
+              # Verify installation
+              nvidia-smi
+
+              touch /tmp/nvidia_driver_install_complete
+
+              # Install nvidia-container-runtime
+              apt install -y gnupg
+              curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
+              curl -s -L https://nvidia.github.io/nvidia-docker/ubuntu20.04/nvidia-docker.list > /etc/apt/sources.list.d/nvidia-docker.list
+              apt update -y
+              apt install -y nvidia-container-runtime
+
+              # Install containerd.config
+              cat <<EOF | tee /etc/containerd/config.toml
+              # explicitly use v2 config format
+              version = 2
+
+              # [Set default runtime handler to v2]
+              [plugins."io.containerd.grpc.v1.cri".containerd]
+                default_runtime_name = "nvidia"
+              [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+                runtime_type = "io.containerd.runc.v2"
+              [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+                runtime_type = "io.containerd.runc.v2"
+                runtime_engine = ""
+                runtime_root = ""
+                privileged_without_host_devices = false
+                base_runtime_spec = ""
+                [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+                  BinaryName = "nvidia-container-runtime"
+
+              # Setup a runtime with the magic name ("test-handler") used for Kubernetes
+              # runtime class tests ...
+              [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.test-handler]
+                runtime_type = "io.containerd.runc.v2"
+
+              [plugins."io.containerd.grpc.v1.cri"]
+                # use fixed sandbox image
+                sandbox_image = "k8s.gcr.io/pause:3.3"
+                # allow hugepages controller to be missing
+                # see https://github.com/containerd/cri/pull/1501
+                tolerate_missing_hugepages_controller = true
+                # explicitly use default snapshotter so we can sed it in entrypoint
+                snapshotter = "overlayfs"
+              EOF
+              systemctl restart containerd
+          resources:
+            requests:
+              cpu: 150m
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: dev
+              mountPath: /dev
+            - name: root-mount
+              mountPath: /root
+
+      containers:
+        - image: "gcr.io/google-containers/pause:2.0"
+          name: pause

@@ -1,19 +1,23 @@
-up:
+up-cea:
 	kind create cluster --config kind.yaml
+	kubectl apply -f cea/driver-installer.yaml
+	sleep 3
+	kubectl -n kube-system wait pod -l app=driver-installer --for condition=Ready --timeout=600s
 
-install-driver:
-	kubectx kind-kindgpu
-	kubectl apply -f driver-installer.yaml
+up-ncr:
+	kind create cluster --config kind.yaml
+	kubectl apply -f ncr/driver-installer.yaml
+	sleep 3
+	kubectl -n kube-system wait pod -l app=driver-installer --for condition=Ready --timeout=600s
 
-install-device-plugin:
-	kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/cmd/nvidia_gpu/device-plugin.yaml
+apply-ncr: build
+	kubectl replace --force --grace-period=0 -f ncr/vulkan-pod.yaml
 
-.PHONY: vulkan-pod
-vulkan-pod:
-	docker build -t vulkan-pod-app:fixed ./vulkan-pod/app
-	docker build -t vulkan-pod-xserver:fixed ./vulkan-pod/xserver
-	kind load docker-image --name kindgpu --nodes kindgpu-worker vulkan-pod-app:fixed vulkan-pod-xserver:fixed
-	kubectl apply -f vulkan-pod/vulkan-pod.yaml
+.PHONY: build
+build:
+	docker build -t vulkan-app:fixed ./common/vulkan-app
+	docker build -t xserver:fixed ./common/xserver
+	kind load docker-image --name kindgpu --nodes kindgpu-worker vulkan-app:fixed xserver:fixed
 
 down:
 	kind delete cluster --name kindgpu
