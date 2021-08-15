@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vulkan-pod
+spec:
+  volumes:
+    - name: vulkan-icd
+      hostPath:
+        path: /usr/share/vulkan/icd.d
+    - name: libnvidia-32bit
+      hostPath:
+        path: /usr/lib/i386-linux-gnu/libGLX_nvidia.so.0
+    - name: libnvidia-64bit
+      hostPath:
+        path: /usr/lib/x86_64-linux-gnu/libGLX_nvidia.so.0
+
+  containers:
+    - name: vulkan-container
+      image: vulkan-container:fixed
+      command: ["/bin/bash", "-c", "--"]
+      args: ["while true; do sleep 600; done;"]
+      volumeMounts:
+        - mountPath: /usr/share/vulkan/icd.d
+          name: vulkan-icd
+          readOnly: true
+        - mountPath: /usr/lib/i386-linux-gnu/libGLX_nvidia.so.0
+          name: libnvidia-32bit
+          readOnly: true
+        - mountPath: /usr/lib/x86_64-linux-gnu/libGLX_nvidia.so.0
+          name: libnvidia-64bit
+          readOnly: true
