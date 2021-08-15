@@ -1,17 +1,22 @@
-up-cea:
-	kind create cluster --config kind.yaml
-	kubectl apply -f cea/driver-installer.yaml
-	sleep 3
-	kubectl -n kube-system wait pod -l app=driver-installer --for condition=Ready --timeout=600s
 
 up-ncr:
 	kind create cluster --config kind.yaml
 	kubectl apply -f ncr/driver-installer.yaml
-	sleep 3
+	sleep 20
 	kubectl -n kube-system wait pod -l app=driver-installer --for condition=Ready --timeout=600s
 
 apply-ncr: build
 	kubectl replace --force --grace-period=0 -f ncr/vulkan-pod.yaml
+
+up-cea:
+	kind create cluster --config kind.yaml
+	kubectl apply -f cea/driver-installer.yaml
+	sleep 20
+	kubectl -n kube-system wait pod -l app=driver-installer --for condition=Ready --timeout=600s
+	kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/cmd/nvidia_gpu/device-plugin.yaml
+
+apply-cea: build
+	kubectl replace --force --grace-period=0 -f cea/vulkan-pod.yaml
 
 .PHONY: build
 build:

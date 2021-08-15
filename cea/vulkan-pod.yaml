@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vulkan-pod
+  labels:
+    component: vnc
+spec:
+  volumes:
+    - name: x11
+      emptyDir:
+        medium: Memory
+        sizeLimit: 10Mi
+  containers:
+    - name: app
+      image: vulkan-app:fixed
+      command: ["/bin/bash", "-c", "--"]
+      args: ["while true; do sleep 600; done;"]
+      env:
+        - name: DISPLAY
+          value: ":0"
+        # https://github.com/GoogleCloudPlatform/container-engine-accelerators/blob/176ef225b975c536ac31c1155fd33c3122cdb732/cmd/nvidia_gpu/nvidia_gpu.go#L40
+        - name: LD_LIBRARY_PATH
+          value: /usr/local/nvidia/lib64
+      volumeMounts:
+        - name: x11
+          mountPath: /tmp/.X11-unix
+      resources:
+        limits:
+          nvidia.com/gpu: "1"
+      securityContext:
+        privileged: true
+    - name: xserver
+      image: xserver:fixed
+      env:
+        - name: DISPLAY
+          value: ":0"
+      ports:
+        - name: x11vnc
+          containerPort: 5900
+      volumeMounts:
+        - name: x11
+          mountPath: /tmp/.X11-unix
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: vnc
+spec:
+  selector:
+    component: vnc
+  type: NodePort
+  ports:
+    - name: vnc
+      port: 5900
+      nodePort: 5900
