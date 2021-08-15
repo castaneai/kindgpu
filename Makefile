@@ -13,7 +13,7 @@ up-cea:
 	kubectl apply -f cea/driver-installer.yaml
 	sleep 20
 	kubectl -n kube-system wait pod -l app=driver-installer --for condition=Ready --timeout=600s
-	kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/cmd/nvidia_gpu/device-plugin.yaml
+	kubectl apply -f cea/device-plugin.yaml
 
 apply-cea: build
 	kubectl replace --force --grace-period=0 -f cea/vulkan-pod.yaml

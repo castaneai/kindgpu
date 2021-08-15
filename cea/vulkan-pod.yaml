@@ -13,11 +13,11 @@ spec:
   containers:
     - name: app
       image: vulkan-app:fixed
-      command: ["/bin/bash", "-c", "--"]
-      args: ["while true; do sleep 600; done;"]
+      command: ["vkcube"]
       env:
         - name: DISPLAY
           value: ":0"
+        # for GCP nvidia device plugin
         # https://github.com/GoogleCloudPlatform/container-engine-accelerators/blob/176ef225b975c536ac31c1155fd33c3122cdb732/cmd/nvidia_gpu/nvidia_gpu.go#L40
         - name: LD_LIBRARY_PATH
           value: /usr/local/nvidia/lib64
@@ -26,9 +26,9 @@ spec:
           mountPath: /tmp/.X11-unix
       resources:
         limits:
+          # for GCP nvidia device plugin
+          # https://github.com/GoogleCloudPlatform/container-engine-accelerators/blob/b06a7e2ed3a9b071caa403979cedd31557f75fbc/pkg/gpu/nvidia/manager.go#L52
           nvidia.com/gpu: "1"
-      securityContext:
-        privileged: true
     - name: xserver
       image: xserver:fixed
       env:
