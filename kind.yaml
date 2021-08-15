@@ -6,6 +6,12 @@ nodes:
     image: kindest/node:v1.18.15
   - role: worker
     image: kindest/node:v1.18.15
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "cloud.google.com/gke-accelerator=true"
     extraMounts:
       - hostPath: ./apps
         containerPath: /apps
