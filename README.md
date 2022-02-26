@@ -20,3 +20,13 @@ make apply-cea
 # show vkcube
 open vnc://localhost:5900
 ```
+
+on GKE
+
+```sh
+make build-gke
+make up-gke-cea
+make apply-gke-cea
+kubectl port-forward vulkan-pod 5900:5900
+open vnc://localhost:5900
+```

@@ -1,4 +1,4 @@
-FROM ubuntu:20.10
+FROM ubuntu:20.04
 
 RUN apt update -y && apt install -y vulkan-tools mesa-utils libxext6
 
